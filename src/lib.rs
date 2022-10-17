@@ -186,4 +186,23 @@ mod test {
 			let _ctx2 = crate::new(ErrorHandling::PanicOnError);
 		})
 	}
+
+	#[test]
+	fn panic_if_error() {
+		init_logger();
+		test_lock(|| {
+			let mut instant_panic = false;
+			let instant_panic_ptr = &mut instant_panic as *mut bool;
+			let late_panic = std::panic::catch_unwind(|| {
+				let _ctx = crate::new(ErrorHandling::PanicIfError);
+				let panic = std::panic::catch_unwind(|| crate::error!("this should not panic"));
+				unsafe {
+					*instant_panic_ptr = panic.is_err();
+				}
+			})
+			.is_err();
+			assert_eq!(instant_panic, false, "paniced on error");
+			assert_eq!(late_panic, true, "did not panic with logged error");
+		})
+	}
 }

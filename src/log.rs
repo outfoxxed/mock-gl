@@ -6,14 +6,14 @@ macro_rules! error {
 	(unrecoverable: $unrecoverable:expr, $fmt:literal $(, $($tt:tt)*)?) => {
 		if $unrecoverable
 			|| { matches!($crate::meta().error_handling, $crate::ErrorHandling::PanicOnError) } {
-			::std::panic!(concat!("mock-gl: ", $fmt), $($($tt)*)?);
+			::std::panic!(concat!("mock-gl: ", $fmt), $($($tt)*)?)
 		} else {
 			$crate::meta().any_errors = true;
-			::log::error!(target: "mock-gl", concat!($fmt, "\n{:#?}") $(, $($tt)*)?, $crate::CurrentBacktrace);
+			::log::error!(target: "mock-gl", concat!($fmt, "\n{:#?}"), $($($tt)*, )? $crate::CurrentBacktrace)
 		}
 	};
 	($fmt:literal $(, $($tt:tt)*)?) => {
-		error!(unrecoverable: false, $fmt, $($($tt)*)?);
+		$crate::error!(unrecoverable: false, $fmt $(, $($tt)*)?)
 	};
 }
 
