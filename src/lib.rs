@@ -42,7 +42,7 @@ pub fn new(error_handling: ErrorHandling) -> MockContextRef {
 
 	*INSTANCE.lock().unwrap_or_else(|p| p.into_inner()) = Some(MockContextData {
 		error: gl::NO_ERROR,
-		buffers: buffer::BufferManager::new(),
+		buffer_manager: buffer::BufferManager::new(),
 	});
 
 	MockContextRef(PhantomData)
@@ -57,7 +57,7 @@ struct MockContextMetadata {
 
 struct MockContextData {
 	error: GLenum,
-	buffers: buffer::BufferManager,
+	buffer_manager: buffer::BufferManager,
 }
 
 pub struct MockContextRef(PhantomData<()>);

@@ -20,7 +20,7 @@ macro_rules! mapping {
 }
 
 macro_rules! gl_functions {
-	{$(fn $name:ident($($param:ident: $ty:ty),*$(,)?) $( -> $return:ty)? $block:block)*} => {
+	{$(fn $name:ident($($param:ident: $ty:ty),*$(,)?) $(-> $return:ty)? $([$($cmatch:ident),*$(,)?])? $block:block)*} => {
 		$(
 			#[allow(non_snake_case)]
 			pub(crate) unsafe extern "system" fn $name ($($param: $ty),*) $(-> $return)? {
@@ -34,6 +34,8 @@ macro_rules! gl_functions {
 					stringify!($name),
 					$(stringify!($param), $param),*
 				);
+
+				$(let $crate::MockContextData { $($cmatch),*, .. } = &mut *$crate::context();)?
 
 				$block
 			}

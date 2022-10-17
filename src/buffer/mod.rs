@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, slice};
 
-use gl::types::GLuint;
+use gl::types::{GLenum, GLsizei, GLuint};
 
 use crate::{debug, error};
 
@@ -25,26 +25,46 @@ impl BufferManager {
 		}
 	}
 
-	pub fn gen_buffers(&mut self, buffers: &mut [GLuint]) {
-		for buffer_id in buffers.iter_mut() {
-			*buffer_id = self.buffer_index;
-			self.buffer_index += 1;
+	pub fn gen_buffers(&mut self, error: &mut GLenum, buffer_count: GLsizei, buffers: *mut GLuint) {
+		if buffer_count < 0 {
+			*error = gl::INVALID_VALUE;
+			error!("glGenBuffers called with invalid buffer count {}", buffer_count);
+		} else {
+			let buffers = unsafe { slice::from_raw_parts_mut(buffers, buffer_count as usize) };
 
-			self.active_buffers.insert(*buffer_id, Buffer::new(*buffer_id));
+			for buffer_id in buffers.iter_mut() {
+				*buffer_id = self.buffer_index;
+				self.buffer_index += 1;
+
+				self.active_buffers.insert(*buffer_id, Buffer::new(*buffer_id));
+			}
+
+			debug!("created {} buffer(s) {:?}", buffers.len(), buffers);
 		}
-		debug!("created {} buffer(s) {:?}", buffers.len(), buffers);
 	}
 
-	pub fn free_buffers(&mut self, buffers: &mut [GLuint]) {
-		for buffer_id in buffers.iter() {
-			if self.deleted_buffers.contains(buffer_id) {
-				error!("double freed buffer {}", buffer_id);
-			} else if self.active_buffers.remove(buffer_id).is_none() {
-				error!("attempted to free unallocated buffer {}", buffer_id);
-			} else {
-				// the above branch conditional will remove the buffer from `self.active_buffers`
-				self.deleted_buffers.push(*buffer_id);
-				debug!("freed {} buffer(s) {:?}", buffers.len(), buffers);
+	pub fn free_buffers(
+		&mut self,
+		error: &mut GLenum,
+		buffer_count: GLsizei,
+		buffers: *mut GLuint,
+	) {
+		if buffer_count < 0 {
+			*error = gl::INVALID_VALUE;
+			error!("glDeleteBuffers called with invalid buffer count {}", buffer_count);
+		} else {
+			let buffers = unsafe { slice::from_raw_parts_mut(buffers, buffer_count as usize) };
+
+			for buffer_id in buffers.iter() {
+				if self.deleted_buffers.contains(buffer_id) {
+					error!("double freed buffer {}", buffer_id);
+				} else if self.active_buffers.remove(buffer_id).is_none() {
+					error!("attempted to free unallocated buffer {}", buffer_id);
+				} else {
+					// the above branch conditional will remove the buffer from `self.active_buffers`
+					self.deleted_buffers.push(*buffer_id);
+					debug!("freed {} buffer(s) {:?}", buffers.len(), buffers);
+				}
 			}
 		}
 	}
