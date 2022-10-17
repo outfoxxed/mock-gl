@@ -28,8 +28,8 @@ pub enum ErrorHandling {
 		warn: bool,
 	},
 	/// Panic if any errors occured
-	/// during the context's lifetime on drop
-	PanicOnDrop,
+	/// during the context's lifetime on finalize
+	PanicOnFinalize,
 	DoNotPanic,
 }
 
@@ -65,6 +65,26 @@ struct MockContextData {
 }
 
 pub struct MockContextRef(PhantomData<()>);
+
+impl MockContextRef {
+	/// Log dangling references
+	pub fn finalize(self) {
+		let MockContextData {
+			error: _,
+			buffer_manager,
+		} = INSTANCE.lock().unwrap_or_else(|p| p.into_inner()).take().unwrap();
+		buffer_manager.finalize();
+
+		let should_panic = {
+			let m = meta();
+			matches!(m.error_handling, ErrorHandling::PanicOnFinalize) && m.any_errors
+		};
+
+		if should_panic {
+			panic!("mock-gl: errors occured in context");
+		}
+	}
+}
 
 struct MockDataRef<'a>(MutexGuard<'a, Option<MockContextData>>);
 struct MockMetaRef<'a>(MutexGuard<'a, Option<MockContextMetadata>>);
@@ -119,23 +139,17 @@ impl DerefMut for MockMetaRef<'_> {
 
 impl Drop for MockContextRef {
 	fn drop(&mut self) {
-		let data = INSTANCE.lock().unwrap_or_else(|p| p.into_inner()).take();
-		let panic = std::panic::catch_unwind(|| drop(data));
-
-		let should_panic = {
-			let m = meta();
-			matches!(m.error_handling, ErrorHandling::PanicOnDrop) && m.any_errors
-		};
+		// finalize should be called if there was no panic,
+		// but in case of a panic, this should clean it up
+		if META.lock().unwrap().is_some() {
+			::log::warn!(
+				target: "mock-gl",
+				"MockContextRef dropped without calling finalize - dangling references will be ignored"
+			);
+		}
 
 		*META.lock().unwrap() = None;
-
-		if let Err(panic) = panic {
-			std::panic::resume_unwind(panic);
-		}
-
-		if should_panic {
-			panic!("mock-gl: errors occured in context");
-		}
+		*INSTANCE.lock().unwrap_or_else(|p| p.into_inner()) = None;
 	}
 }
 
@@ -172,6 +186,8 @@ mod test {
 			gl::load_with(|s| context.get_proc_address(s));
 
 			f();
+
+			context.finalize();
 		});
 	}
 
@@ -190,23 +206,23 @@ mod test {
 		init_logger();
 		test_lock(|| {
 			let ctx1 = crate::new(ErrorHandling::PanicEarly { warn: true });
-			drop(ctx1);
-			let _ctx2 = crate::new(ErrorHandling::PanicEarly { warn: true });
+			ctx1.finalize();
+			let ctx2 = crate::new(ErrorHandling::PanicEarly { warn: true });
+			ctx2.finalize();
 		})
 	}
 
 	#[test]
-	fn panic_on_drop() {
+	fn panic_on_finalize() {
 		init_logger();
 		test_lock(|| {
 			let mut instant_panic = false;
 			let instant_panic_ptr = &mut instant_panic as *mut bool;
 			let late_panic = std::panic::catch_unwind(|| {
-				let _ctx = crate::new(ErrorHandling::PanicOnDrop);
+				let ctx = crate::new(ErrorHandling::PanicOnFinalize);
 				let panic = std::panic::catch_unwind(|| crate::error!("this should not panic"));
-				unsafe {
-					*instant_panic_ptr = panic.is_err();
-				}
+				unsafe { *instant_panic_ptr = panic.is_err() };
+				ctx.finalize();
 			})
 			.is_err();
 			assert_eq!(instant_panic, false, "paniced on error");
