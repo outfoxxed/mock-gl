@@ -1,5 +1,7 @@
 use std::{ffi::c_void, ptr};
 
+use gl::types::GLenum;
+
 use crate::{buffer::gl_functions::*, MockContextRef};
 
 macro_rules! mapping {
@@ -30,13 +32,14 @@ macro_rules! gl_functions {
 						")",
 					),
 					stringify!($name),
-					$(stringify!($param), $param),*,
+					$(stringify!($param), $param),*
 				);
 
 				$block
 			}
 		)*
 	};
+	(print ) => { "" };
 	(print $param:ident) => { "{}: {:?}" };
 	(print $param:ident, $($rest:tt),*) => {
 		concat!("{}: {:?}, ", gl_functions!(print $($rest),*))
@@ -46,6 +49,17 @@ macro_rules! gl_functions {
 pub(crate) use gl_functions;
 
 mapping! {
+	"glGetError" => glGetError;
 	"glGenBuffers" | "glGenBuffersARB" => glGenBuffers;
 	"glDeleteBuffers" | "glDeleteBuffersARB" => glDeleteBuffers;
+}
+
+gl_functions! {
+	fn glGetError() -> GLenum {
+		let mut ctx = crate::context();
+		let error = ctx.error;
+		ctx.error = gl::NO_ERROR;
+
+		error
+	}
 }

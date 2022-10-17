@@ -107,4 +107,20 @@ mod test {
 			gl::DeleteBuffers(1, &buffer);
 		})
 	}
+
+	#[test]
+	#[should_panic]
+	fn gen_negative() {
+		test_harness(|| unsafe {
+			gl::GenBuffers(-1, std::ptr::null_mut());
+		})
+	}
+
+	#[test]
+	#[should_panic]
+	fn free_negative() {
+		test_harness(|| unsafe {
+			gl::DeleteBuffers(-1, std::ptr::null_mut());
+		})
+	}
 }

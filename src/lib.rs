@@ -11,6 +11,8 @@ pub mod buffer;
 pub mod function_mapping;
 pub mod log;
 
+use gl::types::GLenum;
+
 use self::log::*;
 
 static INSTANCE: Mutex<Option<MockContextData>> = Mutex::new(None);
@@ -39,6 +41,7 @@ pub fn new(error_handling: ErrorHandling) -> MockContextRef {
 	});
 
 	*INSTANCE.lock().unwrap_or_else(|p| p.into_inner()) = Some(MockContextData {
+		error: gl::NO_ERROR,
 		buffers: buffer::BufferManager::new(),
 	});
 
@@ -53,6 +56,7 @@ struct MockContextMetadata {
 }
 
 struct MockContextData {
+	error: GLenum,
 	buffers: buffer::BufferManager,
 }
 
