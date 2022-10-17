@@ -1,4 +1,4 @@
-use gl::types::{GLsizei, GLuint};
+use gl::types::{GLsizei, GLuint, GLboolean};
 
 use crate::function_mapping::gl_functions;
 
@@ -9,5 +9,9 @@ gl_functions! {
 
 	fn glDeleteBuffers(buffer_count: GLsizei, buffers: *mut GLuint) [error, buffer_manager] {
 		buffer_manager.free_buffers(error, buffer_count, buffers);
+	}
+
+	fn glIsBuffer(buffer: GLuint) [buffer_manager] -> GLboolean {
+		buffer_manager.is_buffer(buffer)
 	}
 }

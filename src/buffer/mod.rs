@@ -1,6 +1,6 @@
 use std::{collections::HashMap, slice};
 
-use gl::types::{GLenum, GLsizei, GLuint};
+use gl::types::{GLenum, GLsizei, GLuint, GLboolean};
 
 use crate::{debug, error, warning};
 
@@ -67,6 +67,10 @@ impl BufferManager {
 				}
 			}
 		}
+	}
+
+	pub fn is_buffer(&mut self, buffer: GLuint) -> GLboolean {
+		self.active_buffers.contains_key(&buffer) as u8
 	}
 }
 
@@ -142,5 +146,17 @@ mod test {
 		test_harness(|| unsafe {
 			gl::DeleteBuffers(-1, std::ptr::null_mut());
 		})
+	}
+
+	#[test]
+	fn is_buffer() {
+		test_harness(|| unsafe {
+			let mut buffer = 0;
+			assert_eq!(gl::IsBuffer(buffer), 0);
+			gl::GenBuffers(1, &mut buffer);
+			assert_eq!(gl::IsBuffer(buffer), 1);
+			gl::DeleteBuffers(1, &mut buffer);
+			assert_eq!(gl::IsBuffer(buffer), 0);
+		});
 	}
 }
