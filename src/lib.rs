@@ -22,10 +22,14 @@ pub enum ErrorHandling {
 	/// Panic on bad behavior instead of
 	/// logging - note that some behavior cannot be logged
 	/// and will always panic
-	PanicOnError,
+	///
+	/// * `warn` - panic on warnings
+	PanicEarly {
+		warn: bool,
+	},
 	/// Panic if any errors occured
 	/// during the context's lifetime on drop
-	PanicIfError,
+	PanicOnDrop,
 	DoNotPanic,
 }
 
@@ -120,7 +124,7 @@ impl Drop for MockContextRef {
 
 		let should_panic = {
 			let m = meta();
-			matches!(m.error_handling, ErrorHandling::PanicIfError) && m.any_errors
+			matches!(m.error_handling, ErrorHandling::PanicOnDrop) && m.any_errors
 		};
 
 		*META.lock().unwrap() = None;
@@ -163,7 +167,7 @@ mod test {
 		test_lock(|| {
 			init_logger();
 
-			let context = crate::new(ErrorHandling::PanicOnError);
+			let context = crate::new(ErrorHandling::PanicEarly { warn: true });
 
 			gl::load_with(|s| context.get_proc_address(s));
 
@@ -176,8 +180,8 @@ mod test {
 	fn max_one_context() {
 		init_logger();
 		test_lock(|| {
-			let _ctx1 = crate::new(ErrorHandling::PanicOnError);
-			let _ctx2 = crate::new(ErrorHandling::PanicOnError);
+			let _ctx1 = crate::new(ErrorHandling::PanicEarly { warn: true });
+			let _ctx2 = crate::new(ErrorHandling::PanicEarly { warn: true });
 		})
 	}
 
@@ -185,20 +189,20 @@ mod test {
 	fn multiple_contexts() {
 		init_logger();
 		test_lock(|| {
-			let ctx1 = crate::new(ErrorHandling::PanicOnError);
+			let ctx1 = crate::new(ErrorHandling::PanicEarly { warn: true });
 			drop(ctx1);
-			let _ctx2 = crate::new(ErrorHandling::PanicOnError);
+			let _ctx2 = crate::new(ErrorHandling::PanicEarly { warn: true });
 		})
 	}
 
 	#[test]
-	fn panic_if_error() {
+	fn panic_on_drop() {
 		init_logger();
 		test_lock(|| {
 			let mut instant_panic = false;
 			let instant_panic_ptr = &mut instant_panic as *mut bool;
 			let late_panic = std::panic::catch_unwind(|| {
-				let _ctx = crate::new(ErrorHandling::PanicIfError);
+				let _ctx = crate::new(ErrorHandling::PanicOnDrop);
 				let panic = std::panic::catch_unwind(|| crate::error!("this should not panic"));
 				unsafe {
 					*instant_panic_ptr = panic.is_err();

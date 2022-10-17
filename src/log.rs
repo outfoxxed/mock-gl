@@ -5,7 +5,7 @@ use backtrace::{BacktraceFmt, PrintFmt};
 macro_rules! error {
 	(unrecoverable: $unrecoverable:expr, $fmt:literal $(, $($tt:tt)*)?) => {
 		if $unrecoverable
-			|| { matches!($crate::meta().error_handling, $crate::ErrorHandling::PanicOnError) } {
+			|| matches!($crate::meta().error_handling, $crate::ErrorHandling::PanicEarly { .. }) {
 			::std::panic!(concat!("mock-gl: ", $fmt), $($($tt)*)?)
 		} else {
 			$crate::meta().any_errors = true;
@@ -17,6 +17,17 @@ macro_rules! error {
 	};
 }
 
+macro_rules! warning {
+	($fmt:literal $(, $($tt:tt)*)?) => {
+		if matches!($crate::meta().error_handling, $crate::ErrorHandling::PanicEarly { warn: true }) {
+			::std::panic!(concat!("mock-gl: ", $fmt), $($($tt)*)?)
+		} else {
+			$crate::meta().any_errors = true;
+			::log::warn!(target: "mock-gl", concat!($fmt, "\n{:#?}"), $($($tt)*, )? $crate::CurrentBacktrace)
+		}
+	}
+}
+
 macro_rules! debug {
 	($($tt:tt)+) => {
 		::log::debug!(target: "mock-gl", $($tt)+);
@@ -25,6 +36,7 @@ macro_rules! debug {
 
 pub(crate) use debug;
 pub(crate) use error;
+pub(crate) use warning;
 
 pub(crate) struct CurrentBacktrace;
 

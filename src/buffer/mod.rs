@@ -2,7 +2,7 @@ use std::{collections::HashMap, slice};
 
 use gl::types::{GLenum, GLsizei, GLuint};
 
-use crate::{debug, error};
+use crate::{debug, error, warning};
 
 pub mod gl_functions;
 
@@ -57,9 +57,9 @@ impl BufferManager {
 
 			for buffer_id in buffers.iter() {
 				if self.deleted_buffers.contains(buffer_id) {
-					error!("double freed buffer {}", buffer_id);
+					warning!("double freed buffer {}", buffer_id);
 				} else if self.active_buffers.remove(buffer_id).is_none() {
-					error!("attempted to free unallocated buffer {}", buffer_id);
+					warning!("attempted to free unallocated buffer {}", buffer_id);
 				} else {
 					// the above branch conditional will remove the buffer from `self.active_buffers`
 					self.deleted_buffers.push(*buffer_id);
