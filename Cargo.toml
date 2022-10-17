@@ -7,5 +7,10 @@ description = "Crate for mocking an OpenGL context"
 readme = "README.md"
 
 [dependencies]
+backtrace = "^0.3"
 gl = "^0.14" 
 log = "^0.4"
+thiserror = "^1.0"
+
+[dev-dependencies]
+env_logger = "^0.9"
