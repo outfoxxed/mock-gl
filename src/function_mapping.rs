@@ -78,6 +78,7 @@ mapping! {
 	"glDeleteBuffers" | "glDeleteBuffersARB" => glDeleteBuffers;
 	"glIsBuffer" | "glIsBufferARB" => glIsBuffer;
 	"glBindBuffer" | "glBindBufferARB" => glBindBuffer;
+	"glBufferData" | "glBufferDataARB" => glBufferData;
 }
 
 gl_functions! {

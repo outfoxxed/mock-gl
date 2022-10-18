@@ -1,10 +1,9 @@
-use std::{collections::HashMap, slice};
+use std::{collections::HashMap, ffi::c_void, slice};
 
-use gl::types::{GLboolean, GLenum, GLsizei, GLuint, GLint};
 use enum_map::{enum_map, Enum, EnumMap};
+use gl::types::{GLboolean, GLenum, GLint, GLsizei, GLsizeiptr, GLuint, GLvoid};
 
-use crate::{debug, error, warning};
-use crate::GlVersion;
+use crate::{debug, error, warning, GlVersion};
 
 pub mod gl_functions;
 
@@ -13,7 +12,7 @@ mod test;
 
 pub struct BufferManager {
 	buffer_index: GLuint,
-	active_buffers: HashMap<GLuint, Buffer>,
+	active_buffers: HashMap<GLuint, Option<Buffer>>,
 	deleted_buffers: Vec<GLuint>,
 	bound_buffers: EnumMap<BufferBinding, GLuint>,
 }
@@ -54,15 +53,9 @@ macro_rules! gl_enum {
 					$(Self::$name => gl::$name,)*
 				}
 			}
-
-			fn empty_map() -> EnumMap<Self, GLuint> {
-				enum_map! {
-					$(Self::$name => 0,)*
-				}
-			}
 		}
 
-		impl std::fmt::Display for BufferBinding {
+		impl std::fmt::Display for $ename {
 			fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 				match self {
 					$(Self::$name => write!(f, concat!("GL_", stringify!($name))),)*
@@ -81,6 +74,12 @@ macro_rules! buffer_binding {
 		}
 
 		impl BufferBinding {
+			fn empty_map() -> EnumMap<Self, GLuint> {
+				enum_map! {
+					$(Self::$name => 0,)*
+				}
+			}
+
 			fn check_bound(gl_version: &GlVersion, target: GLenum, map: &EnumMap<Self, GLuint>) -> Option<GLuint> {
 				match target {
 					$(::paste::paste!(gl::[<$name _BINDING>]) => {
@@ -111,8 +110,23 @@ buffer_binding! {
 	SHADER_STORAGE_BUFFER(gl: 4 . 3, es: 3 . 1);
 }
 
+gl_enum! {
+	BufferUsage {
+		STREAM_DRAW(gl: 2 . 1, es: 2 . 0);
+		STREAM_READ(gl: 2 . 1, es: 3 . 0);
+		STREAM_COPY(gl: 2 . 1, es: 3 . 0);
+		STATIC_DRAW(gl: 2 . 1, es: 2 . 0);
+		STATIC_READ(gl: 2 . 1, es: 3 . 0);
+		STATIC_COPY(gl: 2 . 1, es: 3 . 0);
+		DYNAMIC_DRAW(gl: 2 . 1, es: 2 . 0);
+		DYNAMIC_READ(gl: 2 . 1, es: 3 . 0);
+		DYNAMIC_COPY(gl: 2 . 1, es: 3 . 0);
+	}
+}
+
 pub struct Buffer {
-	_id: GLuint,
+	usage: BufferUsage,
+	memory: Vec<u8>,
 }
 
 impl BufferManager {
@@ -136,7 +150,7 @@ impl BufferManager {
 				*buffer_id = self.buffer_index;
 				self.buffer_index += 1;
 
-				self.active_buffers.insert(*buffer_id, Buffer::new(*buffer_id));
+				self.active_buffers.insert(*buffer_id, None);
 			}
 
 			debug!("created {} buffer(s) {:?}", buffers.len(), buffers);
@@ -163,6 +177,12 @@ impl BufferManager {
 				} else {
 					// the above branch conditional will remove the buffer from `self.active_buffers`
 					self.deleted_buffers.push(*buffer_id);
+					for (_, binding) in self.bound_buffers.iter_mut() {
+						if *binding == *buffer_id {
+							*binding = 0;
+							break
+						}
+					}
 					debug!("freed {} buffer(s) {:?}", buffers.len(), buffers);
 				}
 			}
@@ -173,7 +193,13 @@ impl BufferManager {
 		self.active_buffers.contains_key(&buffer) as u8
 	}
 
-	pub fn bind_buffer(&mut self, gl_version: &GlVersion, error: &mut GLenum, target: GLenum, buffer_id: GLuint) {
+	pub fn bind_buffer(
+		&mut self,
+		gl_version: &GlVersion,
+		error: &mut GLenum,
+		target: GLenum,
+		buffer_id: GLuint,
+	) {
 		let target = match BufferBinding::from_gl(target) {
 			None => {
 				*error = gl::INVALID_ENUM;
@@ -183,7 +209,7 @@ impl BufferManager {
 			Some(target) => {
 				target.check_version(gl_version);
 				target
-			}
+			},
 		};
 
 		if buffer_id == 0 {
@@ -202,6 +228,85 @@ impl BufferManager {
 		}
 	}
 
+	fn buffer_data(
+		&mut self,
+		gl_version: &GlVersion,
+		error: &mut GLenum,
+		buffer_id: GLuint,
+		size: GLsizeiptr,
+		data: *const GLvoid,
+		usage: GLenum,
+	) {
+		let usage = match BufferUsage::from_gl(usage) {
+			None => {
+				*error = gl::INVALID_ENUM;
+				error!("called glBufferData on buffer {} with invalid usage {}", buffer_id, usage);
+				return
+			},
+			Some(usage) => {
+				usage.check_version(gl_version);
+				usage
+			},
+		};
+
+		if size < 0 {
+			*error = gl::INVALID_VALUE;
+			error!("attempted to allocate buffer {} with a negative size", buffer_id);
+			return
+		}
+
+		// safe to convert size to usize due to the above check
+		let (memory, memstr) = {
+			// FIXME: allocation can panic
+			if data == std::ptr::null() {
+				(vec![0u8; size as usize], format!("new {size} byte array"))
+			} else {
+				let slice = unsafe { slice::from_raw_parts(data as *const u8, size as usize) };
+
+				(Vec::from(slice), format!("{size} bytes from {data:?}"))
+			}
+		};
+
+		// the buffer is assumed to exist due to being checked
+		// in callers of `buffer_data`
+		*self.active_buffers.get_mut(&buffer_id).unwrap() = Some(Buffer { usage, memory });
+
+		debug!("allocated buffer {} with {} as {}", buffer_id, memstr, usage);
+	}
+
+	pub fn buffer_data_target(
+		&mut self,
+		gl_version: &GlVersion,
+		error: &mut GLenum,
+		target: GLenum,
+		size: GLsizeiptr,
+		data: *const GLvoid,
+		usage: GLenum,
+	) {
+		let target = match BufferBinding::from_gl(target) {
+			None => {
+				*error = gl::INVALID_ENUM;
+				error!("attempted to allocate a buffer for invalid target {}", target);
+				return
+			},
+			Some(target) => {
+				target.check_version(gl_version);
+				target
+			},
+		};
+
+		let buffer_id = match self.bound_buffers[target] {
+			0 => {
+				*error = gl::INVALID_OPERATION;
+				error!("attempted to allocate a buffer for unbound target {}", target);
+				return
+			},
+			x => x,
+		};
+
+		self.buffer_data(gl_version, error, buffer_id, size, data, usage);
+	}
+
 	pub fn get_int(&self, gl_version: &GlVersion, pname: GLenum) -> Option<GLint> {
 		BufferBinding::check_bound(gl_version, pname, &self.bound_buffers).map(|i| i as i32)
 	}
@@ -213,11 +318,5 @@ impl BufferManager {
 				self.active_buffers.keys().collect::<Vec<_>>()
 			);
 		}
-	}
-}
-
-impl Buffer {
-	fn new(id: GLuint) -> Self {
-		Self { _id: id }
 	}
 }

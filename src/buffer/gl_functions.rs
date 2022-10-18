@@ -1,4 +1,4 @@
-use gl::types::{GLboolean, GLsizei, GLuint, GLenum};
+use gl::types::{GLboolean, GLenum, GLsizei, GLsizeiptr, GLuint, GLvoid};
 
 use crate::function_mapping::gl_functions;
 
@@ -25,5 +25,18 @@ gl_functions! {
 	take [gl_version, error, buffer_manager]
 	{
 		buffer_manager.bind_buffer(gl_version, error, target, buffer);
+	}
+
+	fn glBufferData(target: GLenum, size: GLsizeiptr, data: *const GLvoid, usage: GLenum);
+	take [gl_version, error, buffer_manager]
+	{
+		buffer_manager.buffer_data_target(
+			gl_version,
+			error,
+			target,
+			size,
+			data,
+			usage,
+		);
 	}
 }
