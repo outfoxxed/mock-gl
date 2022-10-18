@@ -141,7 +141,7 @@ fn buffer_data_invalid_buffer() {
 #[test]
 #[should_panic]
 fn named_buffer_data_invalid_buffer() {
-	test_harness(GlVersion::from_version(VersionType::GL, 2, 1), || unsafe {
+	test_harness(GlVersion::from_version(VersionType::GL, 4, 0), || unsafe {
 		gl::NamedBufferData(1, 0, std::ptr::null(), gl::STATIC_DRAW);
 	})
 }

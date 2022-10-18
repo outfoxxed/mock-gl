@@ -1,4 +1,4 @@
-use super::{ext::ARB_buffer_storage, GlVersion};
+use super::{ext::ARB_buffer_storage, GlVersion, VersionType};
 use crate::{function_mapping::gl_functions, test::test_harness};
 
 gl_functions! {
@@ -37,7 +37,7 @@ fn extension_present() {
 
 #[test]
 fn gl_version_met() {
-	test_harness(GlVersion::from_version(super::VersionType::GL, 4, 6), || unsafe {
+	test_harness(GlVersion::from_version(VersionType::GL, 4, 6), || unsafe {
 		req_version();
 		req_extension();
 	})
@@ -46,7 +46,15 @@ fn gl_version_met() {
 #[test]
 #[should_panic]
 fn es_version_met_gl() {
-	test_harness(GlVersion::from_version(super::VersionType::ES, 4, 6), || unsafe {
+	test_harness(GlVersion::from_version(VersionType::ES, 4, 6), || unsafe {
 		req_version();
 	})
+}
+
+#[test]
+#[should_panic]
+fn swapped_version() {
+	test_harness(GlVersion::from_version(VersionType::GL, 2, 3), || unsafe {
+		req_version();
+	});
 }
