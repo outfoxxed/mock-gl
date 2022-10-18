@@ -1,6 +1,6 @@
 use gl::types::GLint;
 
-use crate::{test::test_harness, GlVersion, version::VersionType};
+use crate::{test::{test_harness, test_harness_handling}, GlVersion, version::VersionType};
 #[test]
 fn create_destroy() {
 	test_harness(GlVersion::clear(), || unsafe {
@@ -101,4 +101,28 @@ fn bind_invalid_target() {
 		gl::GenBuffers(1, &mut buffer);
 		gl::BindBuffer(gl::TEXTURE0, buffer);
 	})
+}
+
+#[test]
+fn gl_errors() {
+	test_harness_handling(
+		GlVersion::from_version(VersionType::GL, 2, 1),
+		crate::ErrorHandling::DoNotPanic,
+		|| unsafe {
+			gl::GenBuffers(-1, std::ptr::null_mut());
+			assert_eq!(gl::GetError(), gl::INVALID_VALUE);
+
+			gl::DeleteBuffers(-1, std::ptr::null_mut());
+			assert_eq!(gl::GetError(), gl::INVALID_VALUE);
+
+			gl::BindBuffer(gl::ARRAY_BUFFER, 1);
+			assert_eq!(gl::GetError(), gl::INVALID_VALUE);
+
+			let mut buffer = 0;
+			gl::GenBuffers(1, &mut buffer);
+			gl::BindBuffer(gl::TEXTURE, buffer);
+			assert_eq!(gl::GetError(), gl::INVALID_ENUM);
+			gl::DeleteBuffers(1, &mut buffer);
+		}
+	);
 }

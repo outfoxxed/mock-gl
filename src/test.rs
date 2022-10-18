@@ -24,11 +24,11 @@ fn mk_context() -> crate::MockContextRef {
 	crate::new(GlVersion::clear(), ErrorHandling::PanicEarly { warn: true })
 }
 
-pub fn test_harness(version: GlVersion, f: impl FnOnce()) {
+pub fn test_harness_handling(version: GlVersion, error_handling: ErrorHandling, f: impl FnOnce()) {
 	test_lock(|| {
 		init_logger();
 
-		let context = crate::new(version, ErrorHandling::PanicEarly { warn: true });
+		let context = crate::new(version, error_handling);
 
 		gl::load_with(|s| context.get_proc_address(s));
 
@@ -36,6 +36,10 @@ pub fn test_harness(version: GlVersion, f: impl FnOnce()) {
 
 		context.finalize();
 	});
+}
+
+pub fn test_harness(version: GlVersion, f: impl FnOnce()) {
+	test_harness_handling(version, ErrorHandling::PanicEarly { warn: true }, f);
 }
 
 #[test]
