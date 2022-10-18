@@ -101,6 +101,8 @@ mapping! {
 
 gl_functions! {
 	fn glGetError() -> GLenum;
+	require gl 2 . 1;
+	require es 2 . 0;
 	take [error]
 	{
 		let e = *error;
@@ -110,6 +112,8 @@ gl_functions! {
 	}
 
 	fn glGetIntegerv(pname: GLenum, params: *mut GLint);
+	require gl 2 . 1;
+	require es 2 . 0;
 	take [gl_version, error, buffer_manager]
 	{
 		let int = buffer_manager.get_int(gl_version, pname);
