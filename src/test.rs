@@ -14,8 +14,7 @@ pub fn init_logger() {
 	static INIT: Mutex<bool> = Mutex::new(false);
 	let mut lock = INIT.lock().unwrap();
 	if !*lock {
-		let _ =
-			env_logger::builder().filter_level(log::LevelFilter::Trace).is_test(true).init();
+		let _ = env_logger::builder().filter_level(log::LevelFilter::Trace).is_test(true).init();
 		*lock = true;
 	}
 }

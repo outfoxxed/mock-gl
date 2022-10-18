@@ -23,9 +23,9 @@ macro_rules! mapping {
 macro_rules! gl_functions {
 	{$(
 		fn $name:ident($($param:ident: $ty:ty),*$(,)?) $(-> $return:ty)?;
-		$(version gl $gl_major:literal . $gl_minor:literal)?
-		$(version es $es_major:literal . $es_minor:literal)?
-		$(require $req:ident)?
+		$(require gl $gl_major:literal . $gl_minor:literal;)?
+		$(require es $es_major:literal . $es_minor:literal;)?
+		$(require ext $req:ident;)?
 		$(take [$($take:ident),*])?
 		$block:block
 	)*} => {
@@ -46,15 +46,33 @@ macro_rules! gl_functions {
 				#[allow(unused)]
 				let context = &mut *$crate::context();
 
-				$(
-					if !context.gl_version.extensions.contains(&&$crate::version::ext::$req) {
+				let gl_version_met = $crate::version::at_least!(
+					context.gl_version,
+					$(gl: $gl_major . $gl_minor)?
+					$(, es: $es_major . $es_minor)?
+				);
+
+				if !gl_version_met {
+					if false {
+					} $(else if context.gl_version.extensions.contains(&&$crate::version::ext::$req) {
+					} else if true {
 						$crate::error!(
 							"{} requires {}",
 							stringify!($name),
 							$crate::version::ext::$req.provided_str
 						);
+					})? else {
+						$crate::error!(
+							"{}",
+							concat!(
+								stringify!($name),
+								" requires ",
+								$(concat!("OpenGL ", $gl_major, ".", $gl_minor),)?
+								$(concat!(" or OpenGL ES ", $es_major, ".", $es_minor),)?
+							)
+						);
 					}
-				)?
+				}
 
 				let $crate::MockContextData { $($($take),*,)? .. } = context;
 

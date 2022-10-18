@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod test;
+
 pub struct GlVersion {
 	pub ty: VersionType,
 	pub major: u8,
@@ -8,8 +11,12 @@ pub struct GlVersion {
 impl GlVersion {
 	pub fn at_least(&self, gl: Option<(u8, u8)>, es: Option<(u8, u8)>) -> bool {
 		match (self.ty, (self.minor, self.major), gl, es) {
-			(VersionType::GL, (mi, ma), Some((rmi, rma)), _) if ma > rma || (ma == rma && mi >= rmi) => true,
-			(VersionType::ES, (mi, ma), _, Some((rmi, rma))) if ma > rma || (ma == rma && mi >= rmi) => true,
+			(VersionType::GL, (mi, ma), Some((rmi, rma)), _)
+				if ma > rma || (ma == rma && mi >= rmi) =>
+				true,
+			(VersionType::ES, (mi, ma), _, Some((rmi, rma)))
+				if ma > rma || (ma == rma && mi >= rmi) =>
+				true,
 			_ => false,
 		}
 	}
