@@ -19,8 +19,14 @@ macro_rules! mapping {
 	}
 }
 
+// good luck
 macro_rules! gl_functions {
-	{$(fn $name:ident($($param:ident: $ty:ty),*$(,)?) $([$($cmatch:ident),*$(,)?])? $(-> $return:ty)? $block:block)*} => {
+	{$(
+		fn $name:ident($($param:ident: $ty:ty),*$(,)?) $(-> $return:ty)?;
+		$(require $req:ident)?
+		$(take [$($take:ident),*])?
+		$block:block
+	)*} => {
 		$(
 			#[allow(non_snake_case)]
 			pub(crate) unsafe extern "system" fn $name ($($param: $ty),*) $(-> $return)? {
@@ -35,7 +41,18 @@ macro_rules! gl_functions {
 					$(stringify!($param), $param),*
 				);
 
-				$(let $crate::MockContextData { $($cmatch),*, .. } = &mut *$crate::context();)?
+				#[allow(unused)]
+				let $crate::MockContextData { gl_version, $($($take),*,)? .. } = &mut *$crate::context();
+
+				$(
+					if !gl_version.extensions.contains(&&$crate::version::ext::$req) {
+						$crate::error!(
+							"{} requires {}",
+							stringify!($name),
+							$crate::version::ext::$req.provided_str
+						);
+					}
+				)?
 
 				$block
 			}
@@ -58,7 +75,7 @@ mapping! {
 }
 
 gl_functions! {
-	fn glGetError() -> GLenum {
+	fn glGetError() -> GLenum; {
 		let mut ctx = crate::context();
 		let error = ctx.error;
 		ctx.error = gl::NO_ERROR;

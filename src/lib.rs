@@ -10,8 +10,10 @@ use std::{
 pub mod buffer;
 pub mod function_mapping;
 pub mod log;
+pub mod version;
 
 use gl::types::GLenum;
+use version::GlVersion;
 
 use self::log::*;
 
@@ -33,7 +35,7 @@ pub enum ErrorHandling {
 	DoNotPanic,
 }
 
-pub fn new(error_handling: ErrorHandling) -> MockContextRef {
+pub fn new(version: GlVersion, error_handling: ErrorHandling) -> MockContextRef {
 	if INSTANCE.lock().unwrap_or_else(|p| p.into_inner()).is_some() {
 		panic!("Only once MockContext can exist at a time");
 	}
@@ -45,6 +47,7 @@ pub fn new(error_handling: ErrorHandling) -> MockContextRef {
 	});
 
 	*INSTANCE.lock().unwrap_or_else(|p| p.into_inner()) = Some(MockContextData {
+		gl_version: version,
 		error: gl::NO_ERROR,
 		buffer_manager: buffer::BufferManager::new(),
 	});
@@ -60,6 +63,7 @@ struct MockContextMetadata {
 }
 
 struct MockContextData {
+	gl_version: GlVersion,
 	error: GLenum,
 	buffer_manager: buffer::BufferManager,
 }
@@ -70,6 +74,7 @@ impl MockContextRef {
 	/// Log dangling references
 	pub fn finalize(self) {
 		let MockContextData {
+			gl_version: _,
 			error: _,
 			buffer_manager,
 		} = INSTANCE.lock().unwrap_or_else(|p| p.into_inner()).take().unwrap();
@@ -157,7 +162,7 @@ impl Drop for MockContextRef {
 mod test {
 	use std::sync::Mutex;
 
-	use crate::ErrorHandling;
+	use crate::{ErrorHandling, GlVersion};
 
 	// tests can't run in parallel  when they depend on a global variable
 	static TEST_LOCK: Mutex<()> = Mutex::new(());
@@ -177,11 +182,15 @@ mod test {
 		}
 	}
 
-	pub fn test_harness(f: impl FnOnce()) {
+	fn mk_context() -> crate::MockContextRef {
+		crate::new(GlVersion::clear(), ErrorHandling::PanicEarly { warn: true })
+	}
+
+	pub fn test_harness(version: GlVersion, f: impl FnOnce()) {
 		test_lock(|| {
 			init_logger();
 
-			let context = crate::new(ErrorHandling::PanicEarly { warn: true });
+			let context = crate::new(version, ErrorHandling::PanicEarly { warn: true });
 
 			gl::load_with(|s| context.get_proc_address(s));
 
@@ -196,8 +205,8 @@ mod test {
 	fn max_one_context() {
 		init_logger();
 		test_lock(|| {
-			let _ctx1 = crate::new(ErrorHandling::PanicEarly { warn: true });
-			let _ctx2 = crate::new(ErrorHandling::PanicEarly { warn: true });
+			let _ctx1 = mk_context();
+			let _ctx2 = mk_context();
 		})
 	}
 
@@ -205,9 +214,9 @@ mod test {
 	fn multiple_contexts() {
 		init_logger();
 		test_lock(|| {
-			let ctx1 = crate::new(ErrorHandling::PanicEarly { warn: true });
+			let ctx1 = mk_context();
 			ctx1.finalize();
-			let ctx2 = crate::new(ErrorHandling::PanicEarly { warn: true });
+			let ctx2 = mk_context();
 			ctx2.finalize();
 		})
 	}
@@ -219,7 +228,7 @@ mod test {
 			let mut instant_panic = false;
 			let instant_panic_ptr = &mut instant_panic as *mut bool;
 			let late_panic = std::panic::catch_unwind(|| {
-				let ctx = crate::new(ErrorHandling::PanicOnFinalize);
+				let ctx = crate::new(GlVersion::clear(), ErrorHandling::PanicOnFinalize);
 				let panic = std::panic::catch_unwind(|| crate::error!("this should not panic"));
 				unsafe { *instant_panic_ptr = panic.is_err() };
 				ctx.finalize();

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, slice};
 
-use gl::types::{GLenum, GLsizei, GLuint, GLboolean};
+use gl::types::{GLboolean, GLenum, GLsizei, GLuint};
 
 use crate::{debug, error, warning};
 
@@ -19,7 +19,7 @@ pub struct Buffer {
 impl BufferManager {
 	pub fn new() -> Self {
 		Self {
-			buffer_index: 0,
+			buffer_index: 1,
 			active_buffers: HashMap::new(),
 			deleted_buffers: Vec::new(),
 		}
@@ -72,16 +72,8 @@ impl BufferManager {
 	pub fn is_buffer(&mut self, buffer: GLuint) -> GLboolean {
 		self.active_buffers.contains_key(&buffer) as u8
 	}
-}
 
-impl Buffer {
-	fn new(id: GLuint) -> Self {
-		Self { _id: id }
-	}
-}
-
-impl Drop for BufferManager {
-	fn drop(&mut self) {
+	pub fn finalize(self) {
 		if !self.active_buffers.is_empty() {
 			error!(
 				"mock-gl context was dropped with dangling buffers {:?}",
@@ -91,12 +83,20 @@ impl Drop for BufferManager {
 	}
 }
 
+impl Buffer {
+	fn new(id: GLuint) -> Self {
+		Self { _id: id }
+	}
+}
+
 #[cfg(test)]
 mod test {
-	use crate::test::test_harness;
+	use gl::types::GLint;
+
+	use crate::{test::test_harness, GlVersion};
 	#[test]
 	fn create_destroy() {
-		test_harness(|| unsafe {
+		test_harness(GlVersion::clear(), || unsafe {
 			let mut buffer = 0;
 			gl::GenBuffers(1, &mut buffer);
 			gl::DeleteBuffers(1, &mut buffer);
@@ -106,7 +106,7 @@ mod test {
 	#[test]
 	#[should_panic]
 	fn dangling() {
-		test_harness(|| unsafe {
+		test_harness(GlVersion::clear(), || unsafe {
 			let mut buffer = 0;
 			gl::GenBuffers(1, &mut buffer);
 		})
@@ -115,7 +115,7 @@ mod test {
 	#[test]
 	#[should_panic]
 	fn double_free() {
-		test_harness(|| unsafe {
+		test_harness(GlVersion::clear(), || unsafe {
 			let mut buffer = 0;
 			gl::GenBuffers(1, &mut buffer);
 			gl::DeleteBuffers(1, &mut buffer);
@@ -126,7 +126,7 @@ mod test {
 	#[test]
 	#[should_panic]
 	fn invalid_free() {
-		test_harness(|| unsafe {
+		test_harness(GlVersion::clear(), || unsafe {
 			let buffer = 42;
 			gl::DeleteBuffers(1, &buffer);
 		})
@@ -135,7 +135,7 @@ mod test {
 	#[test]
 	#[should_panic]
 	fn gen_negative() {
-		test_harness(|| unsafe {
+		test_harness(GlVersion::clear(), || unsafe {
 			gl::GenBuffers(-1, std::ptr::null_mut());
 		})
 	}
@@ -143,20 +143,20 @@ mod test {
 	#[test]
 	#[should_panic]
 	fn free_negative() {
-		test_harness(|| unsafe {
+		test_harness(GlVersion::clear(), || unsafe {
 			gl::DeleteBuffers(-1, std::ptr::null_mut());
 		})
 	}
 
 	#[test]
 	fn is_buffer() {
-		test_harness(|| unsafe {
+		test_harness(GlVersion::clear(), || unsafe {
 			let mut buffer = 0;
-			assert_eq!(gl::IsBuffer(buffer), 0);
+			assert_eq!(gl::IsBuffer(buffer), gl::FALSE);
 			gl::GenBuffers(1, &mut buffer);
-			assert_eq!(gl::IsBuffer(buffer), 1);
+			assert_eq!(gl::IsBuffer(buffer), gl::TRUE);
 			gl::DeleteBuffers(1, &mut buffer);
-			assert_eq!(gl::IsBuffer(buffer), 0);
-		});
+			assert_eq!(gl::IsBuffer(buffer), gl::FALSE);
+		})
 	}
 }
