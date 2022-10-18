@@ -5,6 +5,29 @@ pub struct GlVersion {
 	pub extensions: Vec<&'static GlExtension>,
 }
 
+impl GlVersion {
+	pub fn at_least(&self, gl: Option<(u8, u8)>, es: Option<(u8, u8)>) -> bool {
+		match (self.ty, (self.minor, self.major), gl, es) {
+			(VersionType::GL, (mi, ma), Some((rmi, rma)), _) if ma > rma || (ma == rma && mi >= rmi) => true,
+			(VersionType::ES, (mi, ma), _, Some((rmi, rma))) if ma > rma || (ma == rma && mi >= rmi) => true,
+			_ => false,
+		}
+	}
+}
+
+macro_rules! at_least {
+	($v:expr, $(gl: $gl_major:literal . $gl_minor:literal)? $(, es: $es_major:literal . $es_minor:literal)?) => {
+		$v.at_least(
+			$crate::version::at_least!(opt $(($gl_major, $gl_minor))?),
+			$crate::version::at_least!(opt $(($es_major, $es_minor))?),
+		)
+	};
+	(opt ) => { None };
+	(opt $($expr:tt)+) => { Some($($expr)*) };
+}
+
+pub(crate) use at_least;
+
 #[derive(Copy, Clone)]
 pub enum VersionType {
 	GL,

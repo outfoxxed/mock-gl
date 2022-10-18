@@ -8,8 +8,10 @@ readme = "README.md"
 
 [dependencies]
 backtrace = "^0.3"
+enum-map = "^2.4"
 gl = "^0.14" 
 log = "^0.4"
+paste = "^1.0"
 thiserror = "^1.0"
 
 [dev-dependencies]

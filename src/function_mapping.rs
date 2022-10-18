@@ -1,6 +1,6 @@
 use std::{ffi::c_void, ptr};
 
-use gl::types::GLenum;
+use gl::types::{GLenum, GLint};
 
 use crate::{buffer::gl_functions::*, MockContextRef};
 
@@ -23,6 +23,8 @@ macro_rules! mapping {
 macro_rules! gl_functions {
 	{$(
 		fn $name:ident($($param:ident: $ty:ty),*$(,)?) $(-> $return:ty)?;
+		$(version gl $gl_major:literal . $gl_minor:literal)?
+		$(version es $es_major:literal . $es_minor:literal)?
 		$(require $req:ident)?
 		$(take [$($take:ident),*])?
 		$block:block
@@ -42,10 +44,10 @@ macro_rules! gl_functions {
 				);
 
 				#[allow(unused)]
-				let $crate::MockContextData { gl_version, $($($take),*,)? .. } = &mut *$crate::context();
+				let context = &mut *$crate::context();
 
 				$(
-					if !gl_version.extensions.contains(&&$crate::version::ext::$req) {
+					if !context.gl_version.extensions.contains(&&$crate::version::ext::$req) {
 						$crate::error!(
 							"{} requires {}",
 							stringify!($name),
@@ -53,6 +55,8 @@ macro_rules! gl_functions {
 						);
 					}
 				)?
+
+				let $crate::MockContextData { $($($take),*,)? .. } = context;
 
 				$block
 			}
@@ -69,17 +73,32 @@ pub(crate) use gl_functions;
 
 mapping! {
 	"glGetError" => glGetError;
+	"glGetIntegerv" => glGetIntegerv;
 	"glGenBuffers" | "glGenBuffersARB" => glGenBuffers;
 	"glDeleteBuffers" | "glDeleteBuffersARB" => glDeleteBuffers;
 	"glIsBuffer" | "glIsBufferARB" => glIsBuffer;
+	"glBindBuffer" | "glBindBufferARB" => glBindBuffer;
 }
 
 gl_functions! {
-	fn glGetError() -> GLenum; {
-		let mut ctx = crate::context();
-		let error = ctx.error;
-		ctx.error = gl::NO_ERROR;
+	fn glGetError() -> GLenum;
+	take [error]
+	{
+		let e = *error;
+		*error = gl::NO_ERROR;
 
-		error
+		e
+	}
+
+	fn glGetIntegerv(pname: GLenum, params: *mut GLint);
+	take [gl_version, error, buffer_manager]
+	{
+		let int = buffer_manager.get_int(gl_version, pname);
+		if let Some(int) = int {
+			*params = int;
+		} else {
+			*error = gl::INVALID_ENUM;
+			crate::error!("mock-gl does not support glGet target {}", pname);
+		}
 	}
 }

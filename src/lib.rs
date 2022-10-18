@@ -85,6 +85,8 @@ impl MockContextRef {
 			matches!(m.error_handling, ErrorHandling::PanicOnFinalize) && m.any_errors
 		};
 
+		*META.lock().unwrap() = None;
+
 		if should_panic {
 			panic!("mock-gl: errors occured in context");
 		}

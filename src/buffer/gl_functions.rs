@@ -1,4 +1,4 @@
-use gl::types::{GLboolean, GLsizei, GLuint};
+use gl::types::{GLboolean, GLsizei, GLuint, GLenum};
 
 use crate::function_mapping::gl_functions;
 
@@ -19,5 +19,11 @@ gl_functions! {
 	take [buffer_manager]
 	{
 		buffer_manager.is_buffer(buffer)
+	}
+
+	fn glBindBuffer(target: GLenum, buffer: GLuint);
+	take [gl_version, error, buffer_manager]
+	{
+		buffer_manager.bind_buffer(gl_version, error, target, buffer);
 	}
 }
