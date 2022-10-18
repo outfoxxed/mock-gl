@@ -307,6 +307,24 @@ impl BufferManager {
 		self.buffer_data(gl_version, error, buffer_id, size, data, usage);
 	}
 
+	pub fn buffer_data_named(
+		&mut self,
+		gl_version: &GlVersion,
+		error: &mut GLenum,
+		buffer_id: GLuint,
+		size: GLsizeiptr,
+		data: *const GLvoid,
+		usage: GLenum,
+	) {
+		if !self.active_buffers.contains_key(&buffer_id) {
+			*error = gl::INVALID_OPERATION;
+			error!("attempted to allocate invalid buffer {}", buffer_id);
+			return
+		}
+
+		self.buffer_data(gl_version, error, buffer_id, size, data, usage);
+	}
+
 	pub fn get_int(&self, gl_version: &GlVersion, pname: GLenum) -> Option<GLint> {
 		BufferBinding::check_bound(gl_version, pname, &self.bound_buffers).map(|i| i as i32)
 	}

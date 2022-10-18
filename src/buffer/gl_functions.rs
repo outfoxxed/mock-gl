@@ -49,4 +49,18 @@ gl_functions! {
 			usage,
 		);
 	}
+
+	fn glNamedBufferData(buffer: GLuint, size: GLsizeiptr, data: *const GLvoid, usage: GLenum);
+	require gl 4 . 0;
+	take [gl_version, error, buffer_manager]
+	{
+		buffer_manager.buffer_data_named(
+			gl_version,
+			error,
+			buffer,
+			size,
+			data,
+			usage,
+		);
+	}
 }

@@ -77,7 +77,7 @@ impl GlVersion {
 	}
 
 	pub fn clear() -> Self {
-		Self::new(VersionType::GL, 2, 1, &[])
+		Self::new(VersionType::GL, 0, 0, &[])
 	}
 }
 

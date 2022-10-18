@@ -9,7 +9,7 @@ use crate::{
 };
 #[test]
 fn create_destroy() {
-	test_harness(GlVersion::clear(), || unsafe {
+	test_harness(GlVersion::from_version(VersionType::GL, 2, 1), || unsafe {
 		let mut buffer = 0;
 		gl::GenBuffers(1, &mut buffer);
 		gl::DeleteBuffers(1, &mut buffer);
@@ -19,7 +19,7 @@ fn create_destroy() {
 #[test]
 #[should_panic]
 fn dangling() {
-	test_harness(GlVersion::clear(), || unsafe {
+	test_harness(GlVersion::from_version(VersionType::GL, 2, 1), || unsafe {
 		let mut buffer = 0;
 		gl::GenBuffers(1, &mut buffer);
 	})
@@ -28,7 +28,7 @@ fn dangling() {
 #[test]
 #[should_panic]
 fn double_free() {
-	test_harness(GlVersion::clear(), || unsafe {
+	test_harness(GlVersion::from_version(VersionType::GL, 2, 1), || unsafe {
 		let mut buffer = 0;
 		gl::GenBuffers(1, &mut buffer);
 		gl::DeleteBuffers(1, &mut buffer);
@@ -39,7 +39,7 @@ fn double_free() {
 #[test]
 #[should_panic]
 fn invalid_free() {
-	test_harness(GlVersion::clear(), || unsafe {
+	test_harness(GlVersion::from_version(VersionType::GL, 2, 1), || unsafe {
 		let buffer = 42;
 		gl::DeleteBuffers(1, &buffer);
 	})
@@ -48,7 +48,7 @@ fn invalid_free() {
 #[test]
 #[should_panic]
 fn gen_negative() {
-	test_harness(GlVersion::clear(), || unsafe {
+	test_harness(GlVersion::from_version(VersionType::GL, 2, 1), || unsafe {
 		gl::GenBuffers(-1, std::ptr::null_mut());
 	})
 }
@@ -56,14 +56,14 @@ fn gen_negative() {
 #[test]
 #[should_panic]
 fn free_negative() {
-	test_harness(GlVersion::clear(), || unsafe {
+	test_harness(GlVersion::from_version(VersionType::GL, 2, 1), || unsafe {
 		gl::DeleteBuffers(-1, std::ptr::null_mut());
 	})
 }
 
 #[test]
 fn is_buffer() {
-	test_harness(GlVersion::clear(), || unsafe {
+	test_harness(GlVersion::from_version(VersionType::GL, 2, 1), || unsafe {
 		let mut buffer = 0;
 		assert_eq!(gl::IsBuffer(buffer), gl::FALSE);
 		gl::GenBuffers(1, &mut buffer);
@@ -135,6 +135,14 @@ fn buffer_data() {
 fn buffer_data_invalid_buffer() {
 	test_harness(GlVersion::from_version(VersionType::GL, 2, 1), || unsafe {
 		gl::BufferData(gl::ARRAY_BUFFER, 0, std::ptr::null(), gl::STATIC_DRAW);
+	})
+}
+
+#[test]
+#[should_panic]
+fn named_buffer_data_invalid_buffer() {
+	test_harness(GlVersion::from_version(VersionType::GL, 2, 1), || unsafe {
+		gl::NamedBufferData(1, 0, std::ptr::null(), gl::STATIC_DRAW);
 	})
 }
 

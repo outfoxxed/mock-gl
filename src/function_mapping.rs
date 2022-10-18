@@ -97,6 +97,7 @@ mapping! {
 	"glIsBuffer" | "glIsBufferARB" => glIsBuffer;
 	"glBindBuffer" | "glBindBufferARB" => glBindBuffer;
 	"glBufferData" | "glBufferDataARB" => glBufferData;
+	"glNamedBufferData" => glNamedBufferData;
 }
 
 gl_functions! {
